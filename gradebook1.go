@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,14 +14,11 @@ func computeAverages(rows [][]string) (count int, quizAvg, midSemAvg, labTestAvg
 
 	var quizTotal, midSemTotal, labTestTotal, labsTotal, preTotal, compreTotal, grandTotal float64
 
-	// Iterate through the dataset (skipping the header row if necessary).
 	for i := 1; i < len(rows); i++ {
 		row := rows[i]
 		if len(row) < 11 {
 			continue
 		}
-
-		// actualRow is used for user-friendly row numbering.
 		actualRow := i + 1
 		id := strings.TrimSpace(row[0])
 
@@ -60,13 +58,11 @@ func computeAverages(rows [][]string) (count int, quizAvg, midSemAvg, labTestAvg
 			continue
 		}
 
-		// Calculate the expected total from individual components.
 		calculated := quiz + midSem + labTest + labs + compre
-		if calculated != total {
+		if (calculated-total) > 0.05 || (total-calculated) > 0.05 {
 			errors = append(errors, fmt.Sprintf("Row %d (ID %s): calculated %.2f != total %.2f", actualRow, id, calculated, total))
 		}
 
-		// Accumulate totals.
 		quizTotal += quiz
 		midSemTotal += midSem
 		labTestTotal += labTest
@@ -78,7 +74,6 @@ func computeAverages(rows [][]string) (count int, quizAvg, midSemAvg, labTestAvg
 		count++
 	}
 
-	// Calculate averages if any valid records were processed.
 	if count > 0 {
 		quizAvg = quizTotal / float64(count)
 		midSemAvg = midSemTotal / float64(count)
@@ -92,7 +87,12 @@ func computeAverages(rows [][]string) (count int, quizAvg, midSemAvg, labTestAvg
 	return
 }
 
-func Top3(rows [][]string, component string) [][]string {
+type RowScore struct {
+	Row   []string
+	Score float64
+}
+
+func Top3(rows [][]string, component string) []RowScore {
 	componentmap := make(map[string]float64)
 	componentmap["quiz"] = 4
 	componentmap["midSem"] = 5
@@ -117,23 +117,23 @@ func Top3(rows [][]string, component string) [][]string {
 
 	sort.Slice(data, func(i, j int) bool { return data[i].score > data[j].score })
 
-	var topRows [][]string
+	var topRows []RowScore
 	for i := 0; i < 3; i++ {
-		topRows = append(topRows, data[i].row)
+		topRows = append(topRows, RowScore{Row: data[i].row, Score: data[i].score})
 	}
 	return topRows
 }
 
 func main() {
 	// Expect the file path as the first command-line argument.
-	//if len(os.Args) < 2 {
-	//	fmt.Println("Usage: go run main.go <file_path>")
-	//	return
-	//}
-	//filePath := os.Args[1]
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run main.go <file_path>")
+		return
+	}
 
-	// Open the Excel file.
-	f, err := excelize.OpenFile("CSgradebook.xlsx")
+	filePath := os.Args[1]
+
+	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return
@@ -178,6 +178,42 @@ func main() {
 		fmt.Println("\nNo overall errors found.")
 	}
 
+	top3 := Top3(rows, "quiz")
+	fmt.Println("\nTop 3 students in the class for Quiz:")
+	for i, row := range top3 {
+		fmt.Printf("No. %d in the class: Id: %s, Marks: %.2f\n", i+1, row.Row[3], row.Score)
+	}
+	top3 = Top3(rows, "midSem")
+	fmt.Println("\nTop 3 students in the class for Mid-Sem:")
+	for i, row := range top3 {
+		fmt.Printf("No. %d in the class: Id: %s, Marks: %.2f\n", i+1, row.Row[3], row.Score)
+	}
+	top3 = Top3(rows, "labTest")
+	fmt.Println("\nTop 3 students in the class for Lab Test:")
+	for i, row := range top3 {
+		fmt.Printf("No. %d in the class: Id: %s, Marks: %.2f\n", i+1, row.Row[3], row.Score)
+	}
+	top3 = Top3(rows, "weeklylabs")
+	fmt.Println("\nTop 3 students in the class for Weekly Labs:")
+	for i, row := range top3 {
+		fmt.Printf("No. %d in the class: Id: %s, Marks: %.2f\n", i+1, row.Row[3], row.Score)
+	}
+	top3 = Top3(rows, "precompre")
+	fmt.Println("\nTop 3 students in the class for Pre-Compre:")
+	for i, row := range top3 {
+		fmt.Printf("No. %d in the class: Id: %s, Marks: %.2f\n", i+1, row.Row[3], row.Score)
+	}
+	top3 = Top3(rows, "compre")
+	fmt.Println("\nTop 3 students in the class for Compre:")
+	for i, row := range top3 {
+		fmt.Printf("No. %d in the class: Id: %s, Marks: %.2f\n", i+1, row.Row[3], row.Score)
+	}
+	top3 = Top3(rows, "total")
+	fmt.Println("\nTop 3 students in the class for Total:")
+	for i, row := range top3 {
+		fmt.Printf("No. %d in the class: Id: %s, Marks: %.2f\n", i+1, row.Row[3], row.Score)
+	}
+
 	branch := make(map[string][][]string)
 	for _, row := range rows[1:] {
 		if strings.Contains(row[3], "2024A3PS") {
@@ -204,42 +240,8 @@ func main() {
 	}
 
 	for branch, bRows := range branch {
-		top3 := Top3(bRows, "quiz")
-		fmt.Printf("\nTop 3 students in %s branch for Quiz:\n", branch)
-		for i, row := range top3 {
-			fmt.Printf("No. %d in %s branch: %s\n", i+1, branch, row[3])
-		}
-		top3 = Top3(bRows, "midSem")
-		fmt.Printf("\nTop 3 students in %s branch for Mid-Sem:\n", branch)
-		for i, row := range top3 {
-			fmt.Printf("No. %d in %s branch: %s\n", i+1, branch, row[3])
-		}
-		top3 = Top3(bRows, "labTest")
-		fmt.Printf("\nTop 3 students in %s branch for Lab Test:\n", branch)
-		for i, row := range top3 {
-			fmt.Printf("No. %d in %s branch: %s\n", i+1, branch, row[3])
-		}
-		top3 = Top3(bRows, "weeklylabs")
-		fmt.Printf("\nTop 3 students in %s branch for Weekly Labs:\n", branch)
-		for i, row := range top3 {
-			fmt.Printf("No. %d in %s branch: %s\n", i+1, branch, row[3])
-		}
-		top3 = Top3(bRows, "precompre")
-		fmt.Printf("\nTop 3 students in %s branch for Pre-Compre:\n", branch)
-		for i, row := range top3 {
-			fmt.Printf("No. %d in %s branch: %s\n", i+1, branch, row[3])
-		}
-		top3 = Top3(bRows, "compre")
-		fmt.Printf("\nTop 3 students in %s branch for Compre:\n", branch)
-		for i, row := range top3 {
-			fmt.Printf("No. %d in %s branch: %s\n", i+1, branch, row[3])
-		}
-		top3 = Top3(bRows, "total")
-		fmt.Printf("\nTop 3 students in %s branch for Total:\n", branch)
-		for i, row := range top3 {
-			fmt.Printf("No. %d in %s branch: %s\n", i+1, branch, row[3])
-		}
-
+		//To get branchwise component top3 use the func as given in the example below
+		/*top3 := Top3(bRows, "quiz")*/
 		c, qAvg, mAvg, ltAvg, lAvg, pAvg, cpAvg, totAvg, errs := computeAverages(bRows)
 		fmt.Printf("\nBranch: %s\n", branch)
 		fmt.Printf("Records: %d\n", c)
